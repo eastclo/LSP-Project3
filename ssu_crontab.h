@@ -9,6 +9,7 @@ int check_add_cmd(char *cmd); //인자 검사 오류시 false리턴
 void write_log(char *msg, char *flag); //현재 시간, flag(run, add) msg를 로그에 기록
 
 void cmd_remove(char *cmd); //remove 명령어 실행
+int check_remove_cmd(char *cmd); //인자 검사 오류시 false리턴
 
 void print_help(); //usage 출력
 
