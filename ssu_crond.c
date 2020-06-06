@@ -5,17 +5,13 @@ FILE *file_fp; //ssu_crontab_file
 FILE *log_fp; //ssu_crontab_log
 char crontabFile[FILELEN]; //ssu_crontab_file 경로
 char logFile[FILELEN]; //ssu_crontab_log 경로
-Llist* list; //ssu_crontab_file 라인단위로 저장하는 연결리스트
 
 int main(void)
 {
+	struct tm nowTime; 
 	time_t now;
 	char buf[FILELEN];
 	int fd;
-
-	list = (Llist*)malloc(sizeof(Llist));
-	list->head = NULL;
-	list->tail = NULL;
 
 	//디몬으로 실행 전 log파일과 ssu_crontab_file의 경로 저장
 	getcwd(buf, FILELEN);
@@ -44,13 +40,22 @@ int main(void)
 //		fprintf(stderr, "daemon process isn't created\n");
 //		exit(1);
 //	}
+	
+	//시간을 x시 x분 00초에 맞춤
+	do {
+		sleep(1);
+		now = time(NULL);
+		localtime_r(&now, &nowTime);
+	} while(nowTime.tm_sec != 0);
 
-	//TODO:시간을 x시 x분 00초에 맞춤
 	while (1) {
 		//매 분마다 명령어 실행
 		execute_crontab_cmd(now);
-		now += 60;
-		sleep(60);
+		sleep(59);
+		do {
+			now = time(NULL);
+			localtime_r(&now, &nowTime);
+		} while(nowTime.tm_sec != 0);
 	}
 
 	exit(0);
@@ -103,149 +108,234 @@ void execute_crontab_cmd(time_t now) //ssu_crontab_file에서 now시간에 실�
 	//파일 락 설정, crontab에서 쓰고 있으면 기다림
 	while(fcntl(fd, F_SETLK, &lock) == -1);
 
-	list->cur = list->head;
-
 	//파일 끝에 도달할 때까지 라인단위로 읽음
 	while(fscanf(file_fp, " %[^\n]", buf) != EOF) {
-		//리스트를 갱신시킴
-		if(list->cur == NULL) //tracking 리스트가 없다면 추가
-			add_list(buf); //리스트에 추가하고 cur로 만듦
-		else if(strcmp(list->cur->cmd.registered, buf) != 0) { //현재 리스트랑 다를 때
-			if(search_data(buf))	//이후 리스트에 있다면 그 사이 리스트는 삭제된 것
-				delete_from_cur(buf); //리스트에서 삭제하고 buf를 cur로 만듦
-			else //이후 리스트에 없다면 새로 추가된 것
-				add_list(buf); //리스트에 추가하고 cur로 만듦
+		if(check_times(now, buf)) { //실행할 시간이라면
+			execute_cmd(buf);
+			write_run_log(logFile, now, buf); //now시간, run msg 로그 기록
 		}
-
-		//갱신된 리스트를 실행시킴
-		if(check_time(now, list->cur->cmd.registered)) { //실행할 시간이라면
-			list->cur->cmd.latest = now; //실행시간 갱신
-			system(list->cur->cmd.command); //실행
-			write_log(logFile, now, list->cur->cmd.registered); //now시간, run msg 로그 기록
-		}
-
-		list->cur = list->cur->next;
 	}
-	//리스트에 남은 것들 삭제
-	delete_remained();
 
-	//리스트 element를 인자로 phtread_create
-	
 	lock.l_type = F_UNLCK;
 	fcntl(fd, F_SETLK, &lock);
 	fclose(file_fp);
 }
 
-void add_list(char *buf) //cur에 새로 buf노드 추가
+int check_times(time_t now, char *cmd) //cmd가 실행할 시간이면 true, 아니면 false
 {
-	node *tmp;
-	char *ptr;
-	int i;
+	struct tm nowTime;
+	char buf[BUFLEN];
+	char *min, *hour, *day, *month, *week;
 
-	tmp = (node*)calloc(1, sizeof(node));	
-	//node buf정보로 초기화
-	strcpy(tmp->cmd.registered, buf);
+	strcpy(buf, cmd);
+	min = strtok(buf, " ");
+	hour = strtok(NULL, " ");
+	day = strtok(NULL, " ");
+	month = strtok(NULL, " ");
+	week = strtok(NULL, " ");
 
-	ptr = strtok(buf, " "); 
-	for(i = 0; i < 5; i++) 
-		ptr = strtok(NULL, " "); 
-	strcpy(tmp->cmd.command, ptr);
-
-	tmp->cmd.latest = 0;
-
-	//리스트에 아무것도 없을 시
-	if(list->head == NULL) {
-		list->head = tmp;
-		list->cur = tmp;
-		list->tail = tmp;
-	}
-	//tail에 추가할 때
-	else if(list->cur == NULL) {
-		list->cur = tmp;
-		list->cur->prev = list->tail;
-		list->tail->next = list->cur;
-		list->tail = list->cur;
-	}
-	//head에 추가할 때
-	else if(list->head == list->cur) {
-		list->cur = tmp;
-		list->cur->next = list->head;
-		list->head->prev = list->cur;
-		list->head = list->cur;
-	}
-	//중간 삽입
-	else {
-		list->cur->prev->next = tmp;
-		tmp->prev = list->cur->prev;
-		list->cur->prev = tmp;
-		tmp->next = list->cur;
-		list->cur = tmp;
-	}
-}
-
-int search_data(char *buf)  //cur이후 registered에 buf가 있다면 true
-{
-	while(list->cur != NULL) {
-		if(strcmp(list->cur->cmd.registered, buf) == 0)
-			return true;
-		list->cur = list->cur->next;
-	}
-	return false;
-}
-
-void delete_from_cur(char *buf) //cur부터 buf전까지 리스트에서 삭제
-{
-	node *tmp;
-	//cur가 head일 경우
-	if(list->cur == list->head) {
-		while(strcmp(list->cur->cmd.registered, buf) != 0) {
-			tmp = list->cur;	
-			list->cur = list->cur->next;
-			free(tmp);
-		}
-		list->head = list->cur;
-		list->cur->prev = NULL;
-	}
-	else {
-		tmp = list->cur->prev;
-		while(strcmp(list->cur->cmd.registered, buf) != 0) {
-			list->cur = list->cur->next;
-			list->cur->prev = tmp;
-			free(tmp->next);
-			tmp->next = list->cur;
-		}
-	}
-}
-
-int check_time(time_t now, char *cmd) //cmd가 실행할 시간이면 true, 아니면 false
-{
-		
-}
-
-void write_log(char *logFile, time_t now, char *msg) //now시간 run msg를 로그에 기록
-{
+	localtime_r(&now, &nowTime);
+	//각 항목 중 하나라도 해당하지 않으면 false
+	if(!check_time(nowTime.tm_wday, WEEK, week))
+		return false;
+	if(!check_time(nowTime.tm_mon, MONTH, month))
+		return false;
+	if(!check_time(nowTime.tm_mday, DAY, day))
+		return false;
+	if(!check_time(nowTime.tm_hour, HOUR, hour))
+		return false;
+	if(!check_time(nowTime.tm_min, MIN, min))
+		return false;
 	
+	return true;
 }
 
-void delete_remained() //cur부터 tail까지 리스트에 남은 것들 삭제
+int check_time(int time_val, int flag, char *cycle) //time_val이 flag(분,시,일,월,주)에 따라 cycle에 해당하면 true
 {
-	node *tmp;
-
-	if(list->cur == NULL)
-		return;
-	//리스트에 cur만 있을 경우
-	else if (list ->cur->prev == NULL) {
-		list->tail = NULL;
-		list->head = NULL;
+	char check[60] = {0,};
+	char lexeme[10] = {0,};
+	int lo, hi, i, j, lexlen = 0;
+	int low, high;
+	switch (flag) {
+		case MIN :
+			lo = 0, hi = 59;
+		break;
+		case HOUR :
+			lo = 0, hi = 23;
+		break;
+		case DAY :
+			lo = 1, hi = 31;
+		break;
+		case MONTH :
+			lo = 1, hi = 12;
+			time_val++;	//tm구조체의 tm_mon은 0~11이므로
+		break;
+		case WEEK :
+			lo = 0, hi = 6;
+		break;
 	}
-	else 
-		list->tail = list->cur->prev;
 
-	while (list->cur != NULL) {
-		tmp = list->cur;
-		list->cur = list->cur->next;
-		free(tmp);
+	for(i = 0; i < strlen(cycle); i++) {
+		lexlen = 0;
+		//숫자 일 때
+		if(isdigit(cycle[i])) { 
+			while(isdigit(cycle[i])) 
+				lexeme[lexlen++] = cycle[i++];
+			lexeme[lexlen] = 0;
+
+			if(cycle[i] != '-') { //범위가 아니라면 해당 숫자만 체크
+				i--;
+				check[atoi(lexeme)] = true;
+			}
+			else { //범위라면 해당 범위 전체 체크
+				low = atoi(lexeme);			
+				i++, lexlen = 0;
+				while(isdigit(cycle[i])) 
+					lexeme[lexlen++] = cycle[i++];
+				lexeme[lexlen] = 0;
+				high = atoi(lexeme);
+				i--;
+				for(j = low; j <= high; j++)
+					check[j] = true;
+			}
+		}
+		//해당 범위 중 일부만 해당이라면
+		else if(cycle[i] == '/') {
+			i++;
+			while(isdigit(cycle[i])) 
+				lexeme[lexlen++] = cycle[i++];
+			lexeme[lexlen] = 0;
+			i--;
+			//n번 째에 해당하지 않으면 false로 체크 	
+			for(j = 0; j + low <= high; j++) {
+				if((j+1)%atoi(lexeme) != 0)	
+					check[j+low] = false;
+			}
+		}
+		//'*'은 범위 전체 체크
+		else if(cycle[i] == '*') {
+			low = lo, high = hi;
+			for(j = lo; j <= hi; j++) 
+				check[j] = true;
+		}
+		//','는 병렬체크
+		else if(cycle[i] == ',') {
+			low = 0, high = 0;
+			memset(check, 0, sizeof(check));
+		}
 	}
-	if(list->tail != NULL)
-		list->tail->next = NULL;
+
+	if(check[time_val] == false)
+		return false;
+	else
+		return true;
+}
+
+void execute_cmd(char *buf) //buf에서 cmd부분 실행
+{
+	char tmp[BUFLEN];
+	char *ptr;	
+	strcpy(tmp, buf);
+
+	ptr = strtok(tmp, " "); //min
+	ptr = strtok(NULL, " "); //hour
+	ptr = strtok(NULL, " "); //day
+	ptr = strtok(NULL, " "); //month
+	ptr = strtok(NULL, " "); //week
+	ptr = strtok(NULL, " "); //cmd
+
+	system(buf+(ptr-tmp)); //strtok로 인해 공백에 NULL이 들어가므로 buf에서 출력한다
+}
+
+void write_run_log(char *logFile, time_t now, char *msg) //now시간 run msg를 로그에 기록
+{
+	struct tm nowTime;
+	struct flock lock; //crontab과 동시에 쓰기 방지를 위한 락 변수	
+	int fd;
+
+	log_fp = fopen(logFile, "r+");
+	fd = fileno(log_fp);
+
+	localtime_r(&now, &nowTime);
+
+	lock.l_type = F_WRLCK;
+	lock.l_whence = 0;
+	lock.l_start = 0L;
+	lock.l_len = 0L;
+
+	//파일 락 설정, crontab에서 쓰고 있으면 기다림
+	while(fcntl(fd, F_SETLK, &lock) == -1);
+
+	fseek(log_fp, 0, SEEK_END);
+	//시간 기록 [Mon May 11 11:57:23 2020]
+	fprintf(log_fp, "[");
+	switch(nowTime.tm_wday) {
+		case 0:
+			fprintf(log_fp, "Sun ");
+			break;
+		case 1:
+			fprintf(log_fp, "Mon ");
+			break;
+		case 2:
+			fprintf(log_fp, "Tue ");
+			break;
+		case 3:
+			fprintf(log_fp, "Wed ");
+			break;
+		case 4:
+			fprintf(log_fp, "Thu ");
+			break;
+		case 5:
+			fprintf(log_fp, "Fri ");
+			break;
+		case 6:
+			fprintf(log_fp, "Sat ");
+			break;
+	}
+	switch(nowTime.tm_mon) {
+		case 0:
+			fprintf(log_fp, "Jan ");
+			break;
+		case 1:
+			fprintf(log_fp, "Feb ");
+			break;
+		case 2:
+			fprintf(log_fp, "Mar ");
+			break;
+		case 3:
+			fprintf(log_fp, "Apr ");
+			break;
+		case 4:
+			fprintf(log_fp, "May ");
+			break;
+		case 5:
+			fprintf(log_fp, "Jun ");
+			break;
+		case 6:
+			fprintf(log_fp, "Jul ");
+			break;
+		case 7:
+			fprintf(log_fp, "Aug ");
+			break;
+		case 8:
+			fprintf(log_fp, "Sep ");
+			break;
+		case 9:
+			fprintf(log_fp, "Oct ");
+			break;
+		case 10:
+			fprintf(log_fp, "Nov ");
+			break;
+		case 11:
+			fprintf(log_fp, "Dec ");
+			break;
+	}
+	fprintf(log_fp, "%02d %02d:%02d:%02d %04d] ", nowTime.tm_mday+1, nowTime.tm_hour, nowTime.tm_min, nowTime.tm_sec, nowTime.tm_year + 1900);
+
+	//명령어 실행 기록
+	fprintf(log_fp, "run %s\n", msg);
+
+	lock.l_type = F_UNLCK;
+	fcntl(fd, F_SETLK, &lock);
+	fclose(log_fp);
 }
