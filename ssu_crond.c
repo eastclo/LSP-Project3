@@ -112,7 +112,7 @@ void execute_crontab_cmd(time_t now) //ssu_crontab_file에서 now시간에 실�
 	while(fscanf(file_fp, " %[^\n]", buf) != EOF) {
 		if(check_times(now, buf)) { //실행할 시간이라면
 			execute_cmd(buf);
-			write_run_log(logFile, now, buf); //now시간, run msg 로그 기록
+			write_run_log(now, buf); //now시간, run msg 로그 기록
 		}
 	}
 
@@ -247,7 +247,7 @@ void execute_cmd(char *buf) //buf에서 cmd부분 실행
 	system(buf+(ptr-tmp)); //strtok로 인해 공백에 NULL이 들어가므로 buf에서 출력한다
 }
 
-void write_run_log(char *logFile, time_t now, char *msg) //now시간 run msg를 로그에 기록
+void write_run_log(time_t now, char *msg) //now시간 run msg를 로그에 기록
 {
 	char* time_ptr; 
 	struct tm nowTime;
