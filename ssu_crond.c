@@ -249,6 +249,7 @@ void execute_cmd(char *buf) //buf에서 cmd부분 실행
 
 void write_run_log(char *logFile, time_t now, char *msg) //now시간 run msg를 로그에 기록
 {
+	char* time_ptr; 
 	struct tm nowTime;
 	struct flock lock; //crontab과 동시에 쓰기 방지를 위한 락 변수	
 	int fd;
@@ -267,73 +268,10 @@ void write_run_log(char *logFile, time_t now, char *msg) //now시간 run msg를 
 	while(fcntl(fd, F_SETLK, &lock) == -1);
 
 	fseek(log_fp, 0, SEEK_END);
-	//시간 기록 [Mon May 11 11:57:23 2020]
-	fprintf(log_fp, "[");
-	switch(nowTime.tm_wday) {
-		case 0:
-			fprintf(log_fp, "Sun ");
-			break;
-		case 1:
-			fprintf(log_fp, "Mon ");
-			break;
-		case 2:
-			fprintf(log_fp, "Tue ");
-			break;
-		case 3:
-			fprintf(log_fp, "Wed ");
-			break;
-		case 4:
-			fprintf(log_fp, "Thu ");
-			break;
-		case 5:
-			fprintf(log_fp, "Fri ");
-			break;
-		case 6:
-			fprintf(log_fp, "Sat ");
-			break;
-	}
-	switch(nowTime.tm_mon) {
-		case 0:
-			fprintf(log_fp, "Jan ");
-			break;
-		case 1:
-			fprintf(log_fp, "Feb ");
-			break;
-		case 2:
-			fprintf(log_fp, "Mar ");
-			break;
-		case 3:
-			fprintf(log_fp, "Apr ");
-			break;
-		case 4:
-			fprintf(log_fp, "May ");
-			break;
-		case 5:
-			fprintf(log_fp, "Jun ");
-			break;
-		case 6:
-			fprintf(log_fp, "Jul ");
-			break;
-		case 7:
-			fprintf(log_fp, "Aug ");
-			break;
-		case 8:
-			fprintf(log_fp, "Sep ");
-			break;
-		case 9:
-			fprintf(log_fp, "Oct ");
-			break;
-		case 10:
-			fprintf(log_fp, "Nov ");
-			break;
-		case 11:
-			fprintf(log_fp, "Dec ");
-			break;
-	}
-	fprintf(log_fp, "%02d %02d:%02d:%02d %04d] ", nowTime.tm_mday+1, nowTime.tm_hour, nowTime.tm_min, nowTime.tm_sec, nowTime.tm_year + 1900);
-
-	//명령어 실행 기록
-	fprintf(log_fp, "run %s\n", msg);
+	//시간 기록 [Mon May 11 11:57:23 2020] run 명령어 기록
+	time_ptr = ctime(&now);
+	time_ptr[strlen(time_ptr)-1] = ']';
+	fprintf(log_fp, "[%s run %s\n", time_ptr, msg);
 
 	lock.l_type = F_UNLCK;
 	fcntl(fd, F_SETLK, &lock);
