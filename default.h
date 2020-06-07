@@ -7,6 +7,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <time.h>
+#include <utime.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -26,6 +27,9 @@
 #endif
 #ifndef BUFLEN
 	#define BUFLEN 1024
+#endif
+#ifndef SECOND_TO_MICRO 
+	#define SECOND_TO_MICRO 1000000
 #endif
 
 #endif
