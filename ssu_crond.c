@@ -196,22 +196,25 @@ int check_time(int time_val, int flag, char *cycle) //time_val이 flag(분,시,�
 					lexeme[lexlen++] = cycle[i++];
 				lexeme[lexlen] = 0;
 				high = atoi(lexeme);
-				i--;
-				for(j = low; j <= high; j++)
-					check[j] = true;
-			}
-		}
-		//해당 범위 중 일부만 해당이라면
-		else if(cycle[i] == '/') {
-			i++;
-			while(isdigit(cycle[i])) 
-				lexeme[lexlen++] = cycle[i++];
-			lexeme[lexlen] = 0;
-			i--;
-			//n번 째에 해당하면 true로 체크 	
-			for(j = 0; j + low <= high; j++) {
-				if((j+1)%atoi(lexeme) == 0)	
-					check[j+low] = true;
+
+				//뒤에 '/'일 경우
+				if(cycle[i] == '/') {
+					i++,lexlen = 0;
+					while(isdigit(cycle[i])) 
+						lexeme[lexlen++] = cycle[i++];
+					lexeme[lexlen] = 0;
+					i--;
+
+					for(j = 0; j + low <= high; j++) {
+						if((j+1)%atoi(lexeme) == 0)
+							check[j+low] = true;
+					}
+				}
+				else {
+					i--;
+					for(j = low; j <= high; j++) 
+						check[j] = true;
+				}
 			}
 		}
 		//'*'은 범위 전체 체크
@@ -229,18 +232,21 @@ int check_time(int time_val, int flag, char *cycle) //time_val이 flag(분,시,�
                 		 lexeme[lexlen++] = cycle[i++];
         		    lexeme[lexlen] = 0;
 		            i--;
-					for(j = 0; j + low <= high; j++) {
+					for(j = 0; j + lo <= hi; j++) {
 						if((j+1)%atoi(lexeme) == 0)
-							check[j+low] = true;
+							check[j+lo] = true;
 					}
 				}
 			}
+			else {
+				for(j = lo; j <= hi; j++) 
+					check[j] = true;
+					break;
+			}
 		}
 		//','는 병렬체크
-		else if(cycle[i] == ',') {
+		else if(cycle[i] == ',') 
 			low = 0, high = 0;
-			memset(check, 0, sizeof(check));
-		}
 	}
 
 	if(check[time_val] == false)
