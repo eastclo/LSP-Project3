@@ -118,7 +118,6 @@ int check_argument(int argc, char **argv) //TODO:인자 오류시 false리턴
 
 void sync_file(char *fname) //해당 파일을 src에서 dst로 동기화
 {
-	sleep(10);
 	struct stat statbuf;
 	char obj_path[FILELEN]; //동기화 대상 파일명(src)
 	char synced_path[FILELEN]; //동기화 된 파일명(dst폴더)
