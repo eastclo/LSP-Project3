@@ -11,7 +11,7 @@
 	#define DIVIDE -3 
 #endif
 #ifndef COMMA
-	#define DIVIDE -4 
+	#define COMMA -4 
 #endif
 
 void ssu_runtime(void); //프로그램 수행시간 출력함수

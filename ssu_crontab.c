@@ -132,8 +132,10 @@ void cmd_add(char *cmd) //add명령어 실행
 	struct flock lock; //crontab과 동시에 쓰기 방지를 위한 락 변수
 	int fd;
 
-	if(check_add_cmd(cmd) == false) //인자 검사 오류시 false
+	if(check_add_cmd(cmd) == false) { //인자 검사 오류시 false
+		print_help();
 		return;
+	}
 
 	file_fp = fopen(crontabFile, "r+");
 	fd = fileno(file_fp);
@@ -167,31 +169,31 @@ int check_add_cmd(char *cmd) //실행주기 오류시 false리턴
 	//분
 	if((ptr = strtok(tmp, " ")) == NULL)
 		return false;
-	if(check_time(0, 59, ptr) == false)
+	if(check_cycle(0, 59, ptr) == false)
 		return false;
 
 	//시
 	if((ptr = strtok(NULL, " ")) == NULL)
 		return false;
-	if(check_time(0, 23, ptr) == false)
+	if(check_cycle(0, 23, ptr) == false)
 		return false;
 
 	//일
 	if((ptr = strtok(NULL, " ")) == NULL)
 		return false;
-	if(check_time(1, 31, ptr) == false)
+	if(check_cycle(1, 31, ptr) == false)
 		return false;
 
 	//월
 	if((ptr = strtok(NULL, " ")) == NULL)
 		return false;
-	if(check_time(1, 12, ptr) == false)
+	if(check_cycle(1, 12, ptr) == false)
 		return false;
 
 	//요일
 	if((ptr = strtok(NULL, " ")) == NULL)
 		return false;
-	if(check_time(0, 6, ptr) == false)
+	if(check_cycle(0, 6, ptr) == false)
 		return false;
 
 	//명령어가 없으면 에러
@@ -205,6 +207,7 @@ int check_add_cmd(char *cmd) //실행주기 오류시 false리턴
 int check_cycle(int low, int high, char *cycle) //cycle이 low, high에 존재하고, 형식에 이상 없으면 true
 {
 	int buf[BUFLEN] = {0,};
+	char lexeme[10] = {0,};
 	int start, end;
 	int i;
 	int buflen = 0, lexlen;
@@ -216,6 +219,7 @@ int check_cycle(int low, int high, char *cycle) //cycle이 low, high에 존재�
 			while(isdigit(cycle[i])) 
 				lexeme[lexlen++] = cycle[i++];
 			lexeme[lexlen] = 0;
+			i--;
 			
 			//범위 초과면 에러
 			if(atoi(lexeme) < low || high < atoi(lexeme))
@@ -238,6 +242,9 @@ int check_cycle(int low, int high, char *cycle) //cycle이 low, high에 존재�
 		//',' 체크
 		else if(cycle[i] == ',') 
 			buf[buflen++] = COMMA;
+		else
+			return false;
+
 	}
 
 	for(i = 0; i < buflen; i++) {
@@ -254,7 +261,7 @@ int check_cycle(int low, int high, char *cycle) //cycle이 low, high에 존재�
 				else if(buf[i+1] == DIVIDE && buf[i+2] > 0) {
 					if(i+3 == buflen)
 						return true;
-					else if(i+4 < buflen && i+3 == COMMA)
+					else if(i+4 < buflen && buf[i+3] == COMMA)
 						i+= 3;
 					//그외 에러
 					else
@@ -403,7 +410,14 @@ int check_remove_cmd(char *cmd) //인자 검사 오류시 false리턴
 	return true;
 }
 
-void print_help() //TODO:usage 출력
+void print_help() //usage 출력
 {
-	printf("도움!!\n");
+   printf("<Usage>\n");
+   printf("1. add <분0-59> <시0-23> <일1-31> <월1-12> <요일0-6> <명령어>\n");
+   printf("\t‘*’: 해당 필드의 모든 값을 의미함\n");
+   printf("\t‘-’: ‘-’으로 연결된 값 사이의 모든 값을 의미함(범위 지정)\n");
+   printf("\t‘,’: ‘,’로 연결된 값들 모두를 의미함(목록)\n");
+   printf("\t‘/’: 앞에 나온 주기의 범위를 뒤에 나온 숫자만큼 건너뛰는 것을 의미함\n");
+   printf("2. remove <COMMAND_NUMBER>\n");
+   printf("3. exit\n\n");
 }
