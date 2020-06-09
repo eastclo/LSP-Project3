@@ -82,27 +82,48 @@ void ssu_rsync(int argc, char **argv) //동기화 시작
 	delete_save_file(); //동기화 취소를 대비한 세이브파일 삭제
 }
 
-int check_argument(int argc, char **argv) //TODO:인자 오류시 false리턴
+int check_argument(int argc, char **argv) //인자 오류시 false리턴
 {
 	struct stat statbuf;
 	char *ptr;
 
-	if(realpath(argv[1], src_parent) == NULL) {
-		fprintf(stderr, "realpath error\n");
+	//<실행파일> <src> <dst> 가 아니면 에러
+	if(argc != 3)
 		return false;
-	}
-	if(realpath(argv[2], dst_rpath) == NULL) {
-		fprintf(stderr, "realpath error\n");
-		return false;
-	}
+	
+	realpath(argv[1], src_parent);
+	realpath(argv[2], dst_rpath);
 
+	//src, dst가 존재하지 않으면 에러
+	if(access(src_parent, F_OK) < 0) 
+		return false;
+	if(access(dst_rpath, F_OK) < 0) 
+		return false;
+
+	//dst가 디렉토리가 아니면 에러
+	lstat(dst_rpath, &statbuf);
+	if(!S_ISDIR(statbuf.st_mode))
+		return false;
+
+	if(access(dst_rpath, R_OK) < 0) 
+		return false;
+	if(access(dst_rpath, W_OK) < 0) 
+		return false;
+	if(access(dst_rpath, X_OK) < 0) 
+		return false;
 
 	/*예외처리 끝난 후 src가 파일, 디렉토리일 경우 나눠서 경로 저장*/
 	lstat(src_parent, &statbuf);
+
+	if(access(src_parent, R_OK) < 0) 
+		return false;
 	
 	//디렉토리일 경우
-	if(S_ISDIR(statbuf.st_mode))
+	if(S_ISDIR(statbuf.st_mode)) {
+		if(access(src_parent, X_OK) < 0) 
+			return false;
 		return true;
+	}
 	//파일일 경우
 	else {
 		//src 부모 디렉토리 경로 저장
@@ -292,6 +313,12 @@ void delete_save_file() //동기화 취소를 대비한 save 파일 삭제
 	}   
 }
 
-void print_help() //TODO:
+void print_help() //usage 출력
 {
+	printf("<Usage>\n");	
+	printf("ssu_rsync <src> <dst>\n");
+	printf("<src> : 동기화 대상 파일 또는 디렉토리(내부 파일 동기화)\n");
+	printf("\tsrc가 존재하고, 권한이 있어야함\n");
+	printf("<dst> : 동기화 장소, 반드시 디렉토리여야 함\n");
+	printf("\tdst가 존재하고, 권한이 있어야함\n");
 }
