@@ -13,3 +13,7 @@ clean :
 	rm ssu_rsync
 	rm ssu_crond
 	rm ssu_crontab
+	rm ssu_crontab_log
+	rm ssu_crontab_file
+	rm ssu_rsync_log
+	rm *.txt
