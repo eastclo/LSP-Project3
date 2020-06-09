@@ -208,17 +208,33 @@ int check_time(int time_val, int flag, char *cycle) //time_val이 flag(분,시,�
 				lexeme[lexlen++] = cycle[i++];
 			lexeme[lexlen] = 0;
 			i--;
-			//n번 째에 해당하지 않으면 false로 체크 	
+			//n번 째에 해당하면 true로 체크 	
 			for(j = 0; j + low <= high; j++) {
-				if((j+1)%atoi(lexeme) != 0)	
-					check[j+low] = false;
+				if((j+1)%atoi(lexeme) == 0)	
+					check[j+low] = true;
 			}
 		}
 		//'*'은 범위 전체 체크
 		else if(cycle[i] == '*') {
-			low = lo, high = hi;
-			for(j = lo; j <= hi; j++) 
-				check[j] = true;
+			if(i+1 < strlen(cycle)) {
+				if(cycle[i+1] != '/') {
+					for(j = lo; j <= hi; j++) 
+						check[j] = true;
+					break;
+				}
+				//뒤에 '/'일경우 추가
+				else {
+					i += 2;
+             		while(isdigit(cycle[i]))
+                		 lexeme[lexlen++] = cycle[i++];
+        		    lexeme[lexlen] = 0;
+		            i--;
+					for(j = 0; j + low <= high; j++) {
+						if((j+1)%atoi(lexeme) == 0)
+							check[j+low] = true;
+					}
+				}
+			}
 		}
 		//','는 병렬체크
 		else if(cycle[i] == ',') {
