@@ -40,6 +40,8 @@ int main(void)
 //		fprintf(stderr, "daemon process isn't created\n");
 //		exit(1);
 //	}
+
+	chdir(buf);//현재 작업디렉토리로 이동
 	
 	//시간을 x시 x분 00초에 맞춤
 	do {
